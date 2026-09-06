@@ -1,0 +1,46 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+vendor/
+
+# JavaScript and generated frontend files
+node_modules/
+dist/
+build/
+coverage/
+
+# Runtime data and uploads
+data/
+media/
+uploads/
+storage/
+outputs/
+demo/
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs, temporary files, backups and packaged deliverables
+logs/
+*.log
+*.tmp
+*.zip
+backup*/
+backups/
+
+# Operating systems and editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
