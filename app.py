@@ -52,7 +52,7 @@ def imp(sid,cam):
  if cam not in ['A','B']:raise ValueError('Camera không hợp lệ')
  s=get(sid)
  if s['protocol']['locked'] or s['records']:raise ValueError('Tạo phiên mới để đổi video sau khi đã click / khóa')
- f=request.files['file'];temp=ROOT/'data'/('upload_'+uuid.uuid4().hex+Path(f.filename).suffix);f.save(temp)
+ f=request.files['file'];temp=DATA_DIR/('upload_'+uuid.uuid4().hex+Path(f.filename).suffix);f.save(temp)
  try:m=index_video(temp)
  finally:temp.unlink(missing_ok=True)
  s['video'+cam]=m['id'];save(s,'import video '+cam);return jsonify(s)
@@ -139,7 +139,7 @@ def export(sid):
  return send_file(export_bundle(get(sid)),as_attachment=True)
 @app.get('/api/backup')
 def backup():
- out=ROOT/'data'/'backup.sqlite'
+ out=DATA_DIR/'backup.sqlite'
  with db() as src:
   with sqlite3.connect(out) as dst:src.backup(dst)
  return send_file(out,as_attachment=True)
