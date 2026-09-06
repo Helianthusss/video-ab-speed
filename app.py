@@ -1,4 +1,4 @@
-import sys,os
+import sys,os,hmac
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent
 import json,sqlite3,uuid,datetime,copy,io,zipfile,threading
@@ -7,6 +7,8 @@ from core import *
 from media import index_video,metadata,frame_bytes
 app=Flask(__name__,static_folder='static');app.config['MAX_CONTENT_LENGTH']=16*1024**3
 DATA_DIR=Path(os.environ.get('AB_DATA_DIR',ROOT/'data')).expanduser().resolve()
+AUTH_USERNAME=os.environ.get('AB_USERNAME','')
+AUTH_PASSWORD=os.environ.get('AB_PASSWORD','')
 DB=DATA_DIR/'survey.sqlite';DB.parent.mkdir(parents=True,exist_ok=True);LOCK=threading.RLock()
 def now():return datetime.datetime.now(datetime.timezone.utc).isoformat()
 def db():
@@ -31,6 +33,25 @@ def error(e):return jsonify(error=str(e)),400
 def local_only():
  if request.host.split(':')[0] not in ['127.0.0.1','localhost']:raise ValueError('Chỉ truy cập cục bộ')
  if request.method=='POST' and request.headers.get('Origin') and request.headers['Origin'] not in ['http://127.0.0.1:8765','http://localhost:8765']:raise ValueError('Nguồn yêu cầu không hợp lệ')
+@app.before_request
+def require_auth():
+    host=request.host.split(':')[0]
+    if host in ['127.0.0.1','localhost'] and not AUTH_USERNAME and not AUTH_PASSWORD:
+        return None
+
+    if not AUTH_USERNAME or not AUTH_PASSWORD:
+        return 'Server authentication is not configured',503
+
+    auth=request.authorization
+    if not auth or not (
+        hmac.compare_digest(auth.username or '',AUTH_USERNAME)
+        and hmac.compare_digest(auth.password or '',AUTH_PASSWORD)
+    ):
+        return (
+            'Authentication required',
+            401,
+            {'WWW-Authenticate':'Basic realm="Video AB Speed Survey"'}
+        )
 @app.get('/')
 def home():return send_from_directory('static','index.html')
 @app.get('/api/sessions')
