@@ -1,5 +1,6 @@
 import sys,os,hmac
 from pathlib import Path
+from urllib.parse import urlsplit
 ROOT=Path(__file__).resolve().parent
 import json,sqlite3,uuid,datetime,copy,io,zipfile,threading
 from flask import Flask,request,jsonify,send_file,send_from_directory
@@ -31,8 +32,23 @@ def new_session(mode):
 def error(e):return jsonify(error=str(e)),400
 @app.before_request
 def local_only():
- if request.host.split(':')[0] not in ['127.0.0.1','localhost']:raise ValueError('Chỉ truy cập cục bộ')
- if request.method=='POST' and request.headers.get('Origin') and request.headers['Origin'] not in ['http://127.0.0.1:8765','http://localhost:8765']:raise ValueError('Nguồn yêu cầu không hợp lệ')
+    host=request.host.split(':',1)[0].lower()
+
+    if host in ['127.0.0.1','localhost']:
+        if request.method=='POST':
+            origin=request.headers.get('Origin')
+            if origin and urlsplit(origin).hostname not in ['127.0.0.1','localhost']:
+                raise ValueError('Nguồn yêu cầu không hợp lệ')
+        return None
+
+    allowed_host=os.environ.get('AB_ALLOWED_HOST','').strip().lower()
+    if not allowed_host or host != allowed_host:
+        raise ValueError('Host không được phép')
+
+    if request.method=='POST':
+        origin=request.headers.get('Origin')
+        if origin and urlsplit(origin).hostname != allowed_host:
+            raise ValueError('Nguồn yêu cầu không hợp lệ')
 @app.before_request
 def require_auth():
     host=request.host.split(':')[0]
