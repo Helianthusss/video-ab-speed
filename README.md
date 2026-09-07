@@ -103,6 +103,7 @@ Chưa có upload PDF, Word, Excel hoặc hồ sơ tổng quát. Cơ chế local 
 ## Tài liệu phát triển
 
 - `docs/USER_GUIDE_VI.md`: hướng dẫn sử dụng từng bước bằng tiếng Việt.
+- `docs/HUONG_DAN_SU_DUNG_CO_HINH_MINH_HOA.docx`: hướng dẫn Word có ảnh chụp màn hình, dành cho người mới sử dụng máy tính và chưa có kinh nghiệm nghiên cứu.
 - `PROJECT_MANIFEST.md`: kiến trúc, API, dữ liệu và các giới hạn.
 - `AI_CONTEXT.md`: ngữ cảnh ngắn dành cho ChatGPT/Codex.
 - `docs/METHOD_TRACEABILITY.md`: đối chiếu yêu cầu phương pháp.
