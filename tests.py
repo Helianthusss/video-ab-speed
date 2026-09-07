@@ -34,9 +34,18 @@ class Acceptance(unittest.TestCase):
   def call(op,v):
    nonlocal ss
    r=self.c.post('/api/action/'+ss['id'],json={'op':op,'value':v,'revision':ss['revision']});self.assertEqual(r.status_code,200,r.json);ss=r.json
-  call('entry',dict(direction='A→B',type='MC',frame=20));rid=ss['records'][-1]['id'];call('exit',dict(id=rid,frame=240));call('record',dict(id=rid,decision='keep',matching='confirmed',reviewer='Test',reason='Known fixture',qc=[0]));self.assertEqual(measure(ss['records'][-1],ss)['speed'],36)
+  call('entry',dict(direction='A→B',type='MC',frame=20,description='Synthetic vehicle'));rid=ss['records'][-1]['id'];call('exit',dict(id=rid,frame=240));call('record',dict(id=rid,decision='keep',matching='confirmed',reviewer='Test',reason='Known fixture',qc=[0]));self.assertEqual(measure(ss['records'][-1],ss)['speed'],36)
   saved=get(ss['id']);self.assertEqual(saved,ss)
   sync=copy.deepcopy(ss['sync']);sync.update(offset_start=2,offset_end=2);call('settings',{'sync':sync});self.assertEqual(measure(ss['records'][-1],ss)['speed'],30)
   old=self.c.get('/api/history/'+ss['id']).json[-1]['seq'];restored=self.c.post(f"/api/restore/{ss['id']}/{old}").json;self.assertEqual(len(restored['records']),6)
+  with db() as c:c.execute('DELETE FROM sessions WHERE id=?',(ss['id'],));c.execute('DELETE FROM history WHERE session=?',(ss['id'],))
+ def test_measurement_readiness_messages(self):
+  ss=copy.deepcopy(self.s);ss['observer']='';ss['L']=None;ss['sync']['verified']=False;ss['line_locked']['A']=False
+  missing=measurement_readiness(ss)
+  self.assertIn('nhập tên người thao tác',missing);self.assertIn('nhập khoảng cách L',missing);self.assertIn('xác nhận đồng bộ và căn cứ',missing);self.assertIn('vẽ và khóa hai vạch A, B',missing)
+ def test_line_requires_two_valid_points(self):
+  ss=copy.deepcopy(self.s);ss['id']=str(uuid.uuid4());ss['line_locked']['A']=False;ss=save(ss,'test line validation')
+  r=self.c.post('/api/action/'+ss['id'],json={'op':'line','value':{'camera':'A','points':None,'locked':True},'revision':ss['revision']})
+  self.assertEqual(r.status_code,400);self.assertIn('hai điểm',r.json['error'])
   with db() as c:c.execute('DELETE FROM sessions WHERE id=?',(ss['id'],));c.execute('DELETE FROM history WHERE session=?',(ss['id'],))
 if __name__=='__main__':unittest.main(verbosity=2)

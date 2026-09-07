@@ -13,7 +13,7 @@ AUTH_PASSWORD=os.environ.get('AB_PASSWORD','')
 DB=DATA_DIR/'survey.sqlite';DB.parent.mkdir(parents=True,exist_ok=True);LOCK=threading.RLock()
 def now():return datetime.datetime.now(datetime.timezone.utc).isoformat()
 def db():
- c=sqlite3.connect(DB);c.execute('CREATE TABLE IF NOT EXISTS sessions(id TEXT PRIMARY KEY, body TEXT)');c.execute('CREATE TABLE IF NOT EXISTS history(seq INTEGER PRIMARY KEY AUTOINCREMENT,session TEXT,at TEXT,action TEXT,body TEXT)');return c
+ c=sqlite3.connect(DB,timeout=30);c.execute('PRAGMA journal_mode=WAL');c.execute('CREATE TABLE IF NOT EXISTS sessions(id TEXT PRIMARY KEY, body TEXT)');c.execute('CREATE TABLE IF NOT EXISTS history(seq INTEGER PRIMARY KEY AUTOINCREMENT,session TEXT,at TEXT,action TEXT,body TEXT)');return c
 def get(sid):
  with db() as c:r=c.execute('SELECT body FROM sessions WHERE id=?',(sid,)).fetchone()
  if not r:raise ValueError('Không có phiên')
@@ -89,7 +89,9 @@ def imp(sid,cam):
  if cam not in ['A','B']:raise ValueError('Camera không hợp lệ')
  s=get(sid)
  if s['protocol']['locked'] or s['records']:raise ValueError('Tạo phiên mới để đổi video sau khi đã click / khóa')
- f=request.files['file'];temp=DATA_DIR/('upload_'+uuid.uuid4().hex+Path(f.filename).suffix);f.save(temp)
+ f=request.files.get('file')
+ if not f or not f.filename:raise ValueError('Chưa chọn tệp video')
+ temp=DATA_DIR/('upload_'+uuid.uuid4().hex+Path(f.filename).suffix);f.save(temp)
  try:m=index_video(temp)
  finally:temp.unlink(missing_ok=True)
  s['video'+cam]=m['id'];save(s,'import video '+cam);return jsonify(s)
@@ -106,8 +108,21 @@ def validate_session(s):
  if p['locked'] and (not s['site'] or not s['observer'] or not s['L'] or not sy['verified'] or not sy['references'] or not all(s['line_locked'].values())):raise ValueError('Khóa cần site, người đo, L, mốc đồng bộ và hai vạch đã khóa')
 
 def stamp(s,r,cam,index):
- m=metadata(s['video'+cam]);f=m['frames'][index]
+ key=s.get('video'+cam)
+ if not key:raise ValueError('Camera '+cam+' chưa có video')
+ m=metadata(key)
+ if not isinstance(index,int) or index<0 or index>=len(m['frames']):raise ValueError('Frame '+cam+' không hợp lệ')
+ f=m['frames'][index]
  r['frame'+cam]=index;r['t'+cam]=f['time'];r['pts'+cam]=f['pts'];r['time_base'+cam]=f['time_base'];r['video'+cam]=m['id']
+
+def measurement_readiness(s):
+ missing=[]
+ if not s.get('videoA') or not s.get('videoB'):missing.append('nhập đủ video A và B')
+ if not s.get('observer'):missing.append('nhập tên người thao tác')
+ if not s.get('L') or s['L']<=0:missing.append('nhập khoảng cách L')
+ if not s.get('sync',{}).get('verified') or not s.get('sync',{}).get('references'):missing.append('xác nhận đồng bộ và căn cứ')
+ if not all(s.get('line_locked',{}).get(c) and s.get('lines',{}).get(c) for c in ['A','B']):missing.append('vẽ và khóa hai vạch A, B')
+ return missing
 
 @app.post('/api/action/<sid>')
 def action(sid):
@@ -125,16 +140,24 @@ def action(sid):
    validate_session(s)
   elif op=='line':
    cam=v['camera']
+   if cam not in ['A','B']:raise ValueError('Camera không hợp lệ')
    if s['line_locked'][cam]:raise ValueError('Vạch đã khóa')
+   points=v.get('points')
+   if not isinstance(points,list) or len(points)!=2 or any(not isinstance(p,list) or len(p)!=2 or any(not isinstance(x,(int,float)) or x<0 or x>1 for x in p) for p in points):raise ValueError('Hãy chọn đủ hai điểm hợp lệ trên ảnh trước khi lưu vạch')
    s['lines'][cam]=v['points'];s['line_locked'][cam]=v['locked']
   elif op=='entry':
-   if not s['videoA'] or not s['videoB']:raise ValueError('Cần hai video')
+   missing=measurement_readiness(s)
+   if missing:raise ValueError('Chưa thể ghi mốc: '+'; '.join(missing))
+   if v.get('direction') not in ['A→B','B→A']:raise ValueError('Hướng xe không hợp lệ')
+   if v.get('type') not in CLASSES:raise ValueError('Loại xe không hợp lệ')
+   if not str(v.get('description','')).strip():raise ValueError('Hãy nhập đặc điểm nhận dạng xe')
    cam='A' if v['direction']=='A→B' else 'B'
    r=dict(id=v.get('id') or 'V'+uuid.uuid4().hex[:10],type=v['type'],direction=v['direction'],observer=s['observer'],protocol_version=s['protocol']['version'],sync_version=s['sync']['version'],qc=[0],decision='review',matching='pending',reason='',sampling_status=v.get('sampling_status','census'),description=v.get('description',''),created=now(),updated=now())
    if any(x['id']==r['id'] for x in s['records']):raise ValueError('Trùng ID')
    stamp(s,r,cam,v['frame']);s['records'].append(r)
   elif op in ['exit','record']:
-   r=next(x for x in s['records'] if x['id']==v['id'])
+   r=next((x for x in s['records'] if x['id']==v.get('id')),None)
+   if not r:raise ValueError('Không tìm thấy xe đang xử lý')
    if op=='exit':stamp(s,r,'B' if r['direction']=='A→B' else 'A',v['frame']);r['matching']='review'
    else:
     for k in ['type','direction','qc','decision','matching','reason','reviewer','description','sampling_status']:
