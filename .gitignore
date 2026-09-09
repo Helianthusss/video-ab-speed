@@ -46,6 +46,3 @@ Thumbs.db
 *.swp
 *.egg-info/
 __MACOSX/
-
-# Video demo cho Hugging Face Space, chi day len repo cua Space
-deploy/huggingface/demo.mp4
