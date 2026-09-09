@@ -6,7 +6,7 @@ colorTo: green
 sdk: docker
 app_port: 7860
 pinned: false
-short_description: Công cụ click video đo tốc độ hành trình giữa hai mặt cắt A–B
+short_description: Đo tốc độ hành trình xe giữa hai mặt cắt A–B
 ---
 
 # Khảo sát tốc độ A–B
