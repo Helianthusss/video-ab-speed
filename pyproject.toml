@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "video-ab-survey"
+version = "0.1.0"
+description = "Local two-camera travel speed survey application"
+readme = "README.md"
+requires-python = ">=3.12"
+dynamic = ["dependencies"]
+
+[project.optional-dependencies]
+dev = ["ruff==0.16.6"]
+
+[project.scripts]
+video-ab = "video_ab.web:main"
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+include = ["video_ab*"]
+
+[tool.setuptools.package-data]
+video_ab = ["static/*", "schema.sql"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["backups", "outputs", "__MACOSX", "data", "demo"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+"app.py" = ["F401"]
+"tests/test_acceptance.py" = ["E402"]

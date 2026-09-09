@@ -5,17 +5,17 @@
 ## Kiến trúc
 
 - Backend: Flask 3.1.3 trên Python.
-- Frontend: HTML, CSS và JavaScript thuần trong `static/`; không có bước build frontend.
+- Frontend: HTML, CSS và JavaScript thuần trong `video_ab/static/`; không có bước build frontend.
 - Database: SQLite cục bộ tại `data/survey.sqlite` theo mặc định.
 - Video storage: file được sao chép vào `data/media/<sha256>/`; database lưu mã SHA-256 của video trong JSON phiên khảo sát.
 - Export: `outputs/<session-id>/` và gói ZIP.
-- Authentication: chưa có; ứng dụng chỉ cho phép request tới localhost.
+- Authentication: Basic Auth qua `AB_USERNAME` / `AB_PASSWORD`; host ngoài localhost cần `AB_ALLOWED_HOST`. Mặc định chạy localhost.
 
 ## Môi trường đã kiểm tra
 
 - Python 3.12.14.
-- SQLite 3.51.0.
-- macOS. Mã nguồn dùng thư viện đa nền tảng, nhưng `Start.command` dành cho macOS.
+- SQLite đi kèm Python.
+- Windows: 31 test đạt sau chuẩn hóa; `Start.bat` dành cho Windows. `Start.command` giữ launcher macOS hiện có.
 - Node.js không còn là dependency chạy ứng dụng.
 
 ## Cài đặt
@@ -29,7 +29,13 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-Trên Windows, kích hoạt môi trường bằng `.venv\Scripts\activate`.
+Trên Windows PowerShell, kích hoạt bằng `.\.venv\Scripts\Activate.ps1`, hoặc chạy trực tiếp không cần kích hoạt:
+
+```powershell
+.\.venv\Scripts\python.exe -X utf8 -m video_ab
+```
+
+Có thể bấm đúp `Start.bat`. Môi trường `.venv` phải được tạo trên Windows; không dùng lại môi trường sao chép từ macOS. Xem `docs/CODEBASE_OVERVIEW_VI.md` để hiểu các module và luồng xử lý.
 
 ## Biến môi trường
 
@@ -38,7 +44,8 @@ Sao chép `.env.example` thành `.env` nếu cần ghi lại cấu hình cục b
 - `AB_HOST`: địa chỉ bind, mặc định `127.0.0.1`.
 - `AB_PORT`: cổng, mặc định `8765`.
 - `AB_DATA_DIR`: thư mục database và media, mặc định `./data`.
-- `AB_OUTPUT_DIR`: thư mục tệp xuất, mặc định `./outputs`.
+- `AB_OUTPUT_DIR`: thư mục tệp xuất, mặc định `outputs/` ở gốc checkout.
+- `AB_DEMO_DIR`: thư mục video demo, mặc định `demo/` ở gốc checkout.
 
 `.env`, database, video, file upload và output đều bị loại khỏi Git.
 
@@ -48,7 +55,7 @@ Sao chép `.env.example` thành `.env` nếu cần ghi lại cấu hình cục b
 python scripts/init_db.py
 ```
 
-Ứng dụng cũng tự tạo hai bảng `sessions` và `history` khi khởi động nếu database chưa có. `schema.sql` là schema có thể kiểm tra và dùng để dựng database mới.
+Ứng dụng tự tạo hai bảng `sessions` và `history` khi mở kết nối database đầu tiên. `video_ab/schema.sql` là schema có thể kiểm tra và dùng để dựng database mới.
 
 Tạo dữ liệu tổng hợp an toàn để thử:
 
@@ -74,12 +81,24 @@ AB_PORT=8766 python app.py
 
 ## Kiểm thử
 
-Với database thử riêng:
+Test tự tạo dữ liệu tổng hợp trong thư mục tạm và dọn sau khi chạy; không cần tạo demo thủ công.
 
 ```bash
-AB_DATA_DIR=/tmp/video-ab-test-data AB_OUTPUT_DIR=/tmp/video-ab-test-output python demo_build.py
-AB_DATA_DIR=/tmp/video-ab-test-data AB_OUTPUT_DIR=/tmp/video-ab-test-output python tests.py -q
+python -m unittest discover -s tests -v
 ```
+
+Lệnh cũ `python tests.py -q` vẫn được hỗ trợ.
+
+## Phát triển package
+
+```bash
+python -m pip install -e ".[dev]"
+python -m ruff check .
+python -m ruff format --check .
+python -m video_ab
+```
+
+Package ứng dụng nằm trong `video_ab/`, công cụ trong `scripts/`, kiểm thử trong `tests/`. `app.py` chỉ giữ entry point tương thích. Xem [sơ đồ và luồng mã nguồn](docs/CODEBASE_OVERVIEW_VI.md).
 
 ## Dữ liệu và backup
 
@@ -90,6 +109,18 @@ Không commit `data/`, `demo/`, `outputs/`, database SQLite hoặc video khảo 
 - cấu hình môi trường dùng khi chạy.
 
 Database lưu media ID, còn `index.json` trong kho media được phân giải lại theo thư mục hiện tại. Vì vậy có thể di chuyển một backup đầy đủ gồm database và media sang đường dẫn khác.
+
+### Video khảo sát
+
+Video không nằm trong repository này và không được commit. Repository chỉ chứa mã nguồn và tài liệu.
+
+Video khảo sát được lưu riêng bên ngoài Git. Liên hệ tác giả để được cấp quyền truy cập.
+
+Cách dùng: tải video về máy, mở ứng dụng ở `http://127.0.0.1:8765`, rồi nhập video qua nút chọn tệp của Camera A và Camera B. Ứng dụng tự băm SHA-256, sao chép vào `data/media/<hash>/` và lập chỉ mục PTS. Không cần đặt tệp vào thư mục nào thủ công.
+
+Nên nhập video trên chính máy chạy ứng dụng. Khi truy cập qua proxy hoặc tunnel, giới hạn kích thước request của dịch vụ trung gian có thể chặn video lớn.
+
+Video chứa hình ảnh người và phương tiện tại nơi công cộng. Cân nhắc phạm vi chia sẻ trước khi cấp quyền truy cập.
 
 ## Upload và triển khai
 

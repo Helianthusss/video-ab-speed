@@ -25,8 +25,8 @@ Phần mềm không tự nhận diện xe. Người sử dụng phải đối ch
 | Phiên | Một lần làm việc riêng cho một địa điểm và một cặp video. |
 | Frame | Một khung hình riêng lẻ của video. |
 | Vạch A/B | Đường vàng trên ảnh, đại diện mặt cắt đo ngoài thực địa. |
-| Mốc đầu | Frame ngay trước khi đầu xe chạm hoặc cắt vạch đầu tiên. |
-| Mốc cuối | Frame ngay trước khi chính xe đó chạm hoặc cắt vạch còn lại. |
+| Mốc đầu | Frame đầu tiên mà phần đầu xe chạm hoặc cắt vạch đầu tiên theo chiều di chuyển. |
+| Mốc cuối | Frame đầu tiên mà phần đầu của chính xe đó chạm hoặc cắt vạch còn lại theo chiều di chuyển. |
 | Đồng bộ | Xác định quan hệ thời gian giữa hai camera. |
 | Offset | Số giây cộng vào thời gian Camera B để quy về đồng hồ Camera A. |
 | QC | Mã ghi lại vấn đề về chất lượng của phép đo. |
@@ -46,26 +46,53 @@ Một phiên nghiên cứu cần có:
 
 Không tự tạo số liệu còn thiếu. Nếu chưa có căn cứ cho `L`, sai số hoặc đồng bộ, hãy hỏi người phụ trách nghiên cứu.
 
-## 4. Mở và đóng phần mềm trên MacBook
+## 4. Mở và đóng phần mềm
 
-### Mở phần mềm
+Cách mở và địa chỉ trang khác nhau giữa Windows và macOS. Hãy làm theo đúng phần dành cho máy của bạn.
+
+### Trên Windows
+
+**Mở phần mềm**
+
+1. Mở thư mục chứa phần mềm, ví dụ `D:ideo_ab_github`.
+2. Tìm tệp **Start.bat**.
+3. Bấm đúp vào tệp.
+4. Một cửa sổ đen (Command Prompt) sẽ mở và in địa chỉ trang. Không đóng cửa sổ này khi đang dùng.
+5. Trên Windows trình duyệt **không tự mở**. Hãy tự mở trình duyệt, nhập `http://127.0.0.1:8765` rồi nhấn **Enter**.
+
+Nếu Windows hoặc phần mềm diệt virus hỏi có cho chạy không, chọn cho phép. Nếu cửa sổ đen báo thiếu `.venv\Scripts\python.exe`, phần mềm chưa được cài trên máy này; hãy liên hệ người phụ trách kỹ thuật thay vì tự cài.
+
+**Đóng phần mềm**
+
+1. Chờ dòng **Đã tự lưu** trên trang.
+2. Quay lại cửa sổ đen.
+3. Nhấn đồng thời **Ctrl + C**.
+4. Đóng cửa sổ đen và trình duyệt.
+
+### Trên macOS
+
+**Mở phần mềm**
 
 1. Ra màn hình Desktop.
 2. Tìm **MỞ PHẦN MỀM KHẢO SÁT.command**.
 3. Bấm đúp vào biểu tượng.
 4. Cửa sổ Terminal màu đen sẽ mở. Không đóng cửa sổ này khi đang dùng.
-5. Nếu trang không tự mở, nhập `http://127.0.0.1:8766` vào trình duyệt và nhấn **Enter**.
+5. Trình duyệt thường tự mở. Nếu không, nhập `http://127.0.0.1:8766` vào trình duyệt và nhấn **Enter**.
 
 Nếu macOS chặn trong lần đầu, bấm chuột phải vào biểu tượng, chọn **Open/Mở**, rồi chọn **Open/Mở** lần nữa.
 
-Phần mềm mở thành công khi thấy tiêu đề **Khảo sát tốc độ A–B** và năm tab từ **1. Đo video** đến **5. Kết quả & xuất**.
-
-### Đóng phần mềm
+**Đóng phần mềm**
 
 1. Chờ dòng **Đã tự lưu**.
 2. Quay lại Terminal.
 3. Nhấn đồng thời **Control + C**.
 4. Đóng Terminal và trình duyệt.
+
+### Kiểm tra đã mở đúng
+
+Phần mềm mở thành công khi thấy tiêu đề **Khảo sát tốc độ A–B** và năm tab từ **1. Đo video** đến **5. Kết quả & xuất**.
+
+Hai hệ điều hành dùng **cổng mặc định khác nhau**: Windows là `8765`, macOS là `8766`. Nhập nhầm cổng thì trình duyệt báo không kết nối được dù phần mềm vẫn đang chạy. Số cổng đúng luôn được in trong cửa sổ đen lúc khởi động; khi nghi ngờ, hãy đọc dòng đó.
 
 ## 5. Chọn loại phiên
 
@@ -192,7 +219,7 @@ Nếu bấm ghi mốc quá sớm, phần mềm sẽ liệt kê mục còn thiế
 3. Nhập đặc điểm rõ ràng, ví dụ: `Xe máy đen, người lái áo trắng, làn giữa, sau ô tô đỏ`.
 4. Phát Camera A để tìm xe.
 5. Khi xe gần vạch, tạm dừng.
-6. Đi từng frame để chọn **khung hình đầu tiên ngay trước khi phần đầu xe chạm hoặc cắt vạch**.
+6. Đi từng frame để chọn **khung hình đầu tiên mà phần đầu xe chạm hoặc cắt vạch theo chiều di chuyển**.
 7. Bấm **Ghi mốc đầu**.
 8. Chờ thông báo đã lưu.
 
@@ -201,7 +228,7 @@ Nếu bấm ghi mốc quá sớm, phần mềm sẽ liệt kê mục còn thiế
 1. Đọc lại đặc điểm nhận dạng.
 2. Tìm đúng xe bằng loại, màu, hình dáng, làn và thứ tự xe xung quanh.
 3. Khi xe gần vạch B, tạm dừng.
-4. Đi từng frame và chọn khung hình ngay trước khi đầu xe chạm vạch B.
+4. Đi từng frame và chọn khung hình đầu tiên mà phần đầu xe chạm hoặc cắt vạch B.
 5. Kiểm tra **Xe đang xử lý** đang chọn đúng mã xe.
 6. Bấm **Ghi mốc cuối**.
 
@@ -216,6 +243,16 @@ Khoảng thời gian gợi ý chỉ hỗ trợ tìm xe, không phải quy tắc 
 5. Ghi mốc cuối tại Camera A.
 
 Quy tắc chọn frame phải giống mục 12.
+
+### Xác nhận frame qua vạch — thống nhất ngày 09/09/2026
+
+- Frame liền trước phải cho thấy phần đầu xe chưa chạm vạch; frame được chọn là frame đầu tiên chạm hoặc cắt vạch.
+- Nếu xe chuyển từ chưa chạm sang đã cắt vạch giữa hai frame, chọn frame đầu tiên đã cắt vạch. Không tự tạo timestamp nội suy thay cho frame quan sát.
+- Phần mềm lưu PTS/time base gốc của frame được chọn, sau đó áp dụng hiệu chỉnh đồng bộ khi tính thời gian hành trình.
+- Khi bị che khuất hoặc không có frame trước để xác minh, đánh dấu không chắc frame (QC 3), ghi lý do và giữ trạng thái cần rà soát.
+- Áp dụng cùng quy tắc ở hai camera và cả hai hướng. Điểm giữa cạnh dưới khung bao trong bản AI thử chỉ là gợi ý, chưa xác định đầu xe.
+- Quy tắc này áp dụng cho các phép đo tiếp theo. Không tự dịch timestamp các phiên đã đo theo quy tắc cũ; cần xem lại video trước khi sửa.
+
 
 ## 14. Rà soát bản ghi
 
@@ -375,11 +412,11 @@ Không đưa video nghiên cứu lên GitHub. GitHub lưu mã nguồn phần m�
 
 ### Trang không mở
 
-Kiểm tra Terminal còn mở, khởi động lại phần mềm và dùng đúng địa chỉ `http://127.0.0.1:8766`.
+Kiểm tra cửa sổ đen (Command Prompt trên Windows, Terminal trên macOS) còn mở, khởi động lại phần mềm và dùng **đúng cổng của máy mình**: `http://127.0.0.1:8765` trên Windows, `http://127.0.0.1:8766` trên macOS. Số cổng đúng được in trong cửa sổ đen lúc khởi động.
 
 ### Video hoặc nút không hoạt động
 
-Nhấn **Command + R**, chọn lại đúng phiên và kiểm tra Terminal. Nếu vẫn lỗi, chụp màn hình thông báo đỏ và ghi lại nút vừa bấm.
+Tải lại trang: **F5** hoặc **Ctrl + R** trên Windows, **Command + R** trên macOS. Sau đó chọn lại đúng phiên và kiểm tra cửa sổ đen. Nếu vẫn lỗi, chụp màn hình thông báo đỏ và ghi lại nút vừa bấm.
 
 ### Không thấy vạch
 
@@ -395,7 +432,7 @@ Phần JSON nâng cao đã bị sửa sai. Không tiếp tục tự sửa nếu 
 
 ### Báo phiên đã thay đổi
 
-Phiên có thể đang mở ở hai tab. Nhấn **Command + R** và chỉ dùng một tab để nhập dữ liệu.
+Phiên có thể đang mở ở hai tab. Tải lại trang (**F5**/**Ctrl + R** trên Windows, **Command + R** trên macOS) và chỉ dùng một tab để nhập dữ liệu.
 
 ### Chọn nhầm video hoặc khóa nhầm vạch
 

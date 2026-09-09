@@ -17,37 +17,18 @@ Công cụ click video đo tốc độ hành trình từng phương tiện giữ
 | Excel | openpyxl |
 | Word/PDF | python-docx, ReportLab |
 
-Không có framework frontend, package manager Node hoặc bước build frontend. Không có auth, cloud service hay API bên thứ ba.
+Không có framework frontend, package manager Node hoặc bước build frontend. Có Basic Auth trong web.py; không có cloud service hay API bên thứ ba.
 
-## Entry points
+## Entry points và cấu trúc
 
-- `app.py`: Flask server và API; mặc định `127.0.0.1:8765`.
-- `Start.command`: launcher macOS, ưu tiên `.venv/bin/python`.
-- `demo_build.py`: tạo video và dữ liệu tổng hợp an toàn.
-- `scripts/init_db.py`: dựng database trống từ `schema.sql`.
-- `tests.py`: kiểm thử nghiệm thu.
+- `python -m video_ab`: server, mặc định 127.0.0.1:8765.
+- `app.py`: entry point tương thích và WSGI `app:app`.
+- `Start.bat`: Windows; `Start.command`: launcher macOS hiện có.
+- `python -m scripts.demo_build`: dữ liệu tổng hợp, hỗ trợ AB_DEMO_DIR.
+- `python scripts/init_db.py`: dựng database từ video_ab/schema.sql.
+- `python -m unittest discover -s tests -v`: tự tạo/dọn dữ liệu test riêng.
 
-## Cấu trúc quan trọng
-
-```text
-.
-├── app.py                 API, persistence và session workflow
-├── core.py                công thức tốc độ, thống kê, sampling, summary
-├── media.py               nhập video, SHA-256, frame/PTS và giải mã JPEG
-├── exports.py             dữ liệu xuất, CSV, Word, PDF và ZIP
-├── workbook_export.py     Excel nhiều sheet
-├── static/
-│   ├── index.html         giao diện tiếng Việt
-│   ├── app.js             thao tác video và API client
-│   └── style.css
-├── schema.sql             schema SQLite tái tạo
-├── scripts/init_db.py
-├── demo_build.py
-├── tests.py
-└── docs/
-```
-
-Các thư mục runtime `data/`, `demo/` và `outputs/` được tạo khi cần và không commit.
+Package `video_ab/` tách config, web, services, storage, core, media, exports và workbook_export; chứa static và schema.sql. Xem [sơ đồ đầy đủ](docs/CODEBASE_OVERVIEW_VI.md). Metadata và cấu hình Ruff trong pyproject.toml.
 
 ## Database
 
@@ -59,7 +40,7 @@ File mặc định: `data/survey.sqlite`; có thể đổi thư mục bằng `AB
 | `history` | snapshot sau mỗi thao tác để undo/redo và phục hồi |
 | `sqlite_sequence` | SQLite quản lý sequence của history |
 
-Không có migration framework. `schema.sql` là baseline schema. `app.py` vẫn tự tạo bảng để giữ backward compatibility. Database runtime không được commit.
+Không có migration framework. `video_ab/schema.sql` là baseline schema. `video_ab/storage.py` tự tạo bảng để giữ backward compatibility. Database runtime không được commit.
 
 ## Storage
 
@@ -78,7 +59,7 @@ Video A/B upload được băm SHA-256 và sao chép vào `data/media/<hash>/`. 
 - `GET /api/history/<session>`, `POST /api/restore/<session>/<seq>`.
 - `GET /api/export/<session>`, `GET /api/backup`, `POST /api/restore_file`.
 
-Ứng dụng chặn Host/Origin ngoài localhost. Đây không phải authentication hoặc authorization.
+Ứng dụng kiểm tra Host/Origin; host ngoài localhost phải khớp AB_ALLOWED_HOST và dùng Basic Auth (AB_USERNAME / AB_PASSWORD).
 
 ## Quy tắc kiến trúc cần giữ
 
@@ -113,10 +94,10 @@ python app.py
 ## Vấn đề kỹ thuật còn tồn tại
 
 - Flask development server chỉ phù hợp local development.
-- Chưa có auth; không bind ra mạng ngoài khi chưa thiết kế bảo mật.
+- Basic Auth đã có; vẫn cần thiết kế HTTPS và triển khai phù hợp nếu phục vụ ngoài máy cá nhân.
 - SQLite/local media phù hợp một process. Multi-instance cần database và object storage dùng chung.
 - Lập chỉ mục toàn bộ frame có thể tốn thời gian/dung lượng với video nhiều giờ; chưa stress-test quy mô đó.
 - Block bootstrap chưa được triển khai.
 - Audit blinding là che trong UI, không phải phân quyền bảo mật.
-- Chưa có migration versioning ngoài `schema.sql` baseline.
+- Chưa có migration versioning ngoài `video_ab/schema.sql` baseline.
 - Chưa có CI workflow; chạy `tests.py` trước mỗi release.

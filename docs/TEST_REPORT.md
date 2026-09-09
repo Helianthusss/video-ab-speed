@@ -1,10 +1,10 @@
 # Báo cáo kiểm thử nghiệm thu
 
-Ngày chạy: 06-09-2026. Bộ dữ liệu tổng hợp tách khỏi phiên video công khai và mang nhãn demo.
+Lần chạy gần nhất: 09-09-2026 trên Windows 11, Python 3.12.14, bằng `python -m unittest discover -s tests -v`. Lần chạy đầu: 06-09-2026 với 24 phép thử. Bộ dữ liệu tổng hợp tách khỏi phiên video công khai và mang nhãn demo; test tự tạo và tự dọn dữ liệu trong thư mục tạm.
 
 ## Kết quả tự động
 
-24/24 phép thử đạt.
+31/31 phép thử đạt, thời gian chạy 10,9 giây.
 
 | Nhóm | Trường hợp | Kết quả |
 |---|---|---|
@@ -29,6 +29,15 @@ Ngày chạy: 06-09-2026. Bộ dữ liệu tổng hợp tách khỏi phiên vide
 | Lưu dữ liệu | click A/B, duyệt, đóng/mở từ SQLite | Đạt |
 | Cập nhật | sửa sync tính lại tốc độ/tổng hợp | Đạt |
 | Phục hồi | lịch sử phục hồi snapshot cũ không mất bản ghi | Đạt |
+| Điều kiện đo | báo đủ mục còn thiếu: người thao tác, L, đồng bộ, hai vạch | Đạt |
+| Vạch đo | từ chối lưu vạch không đủ hai điểm hợp lệ, trả lỗi 400 | Đạt |
+| Đóng gói | `/`, `/static/app.js`, `/static/style.css` phục vụ từ trong package | Đạt |
+| Đường dẫn | data, output và demo nằm trong thư mục tạm khi đặt biến môi trường | Đạt |
+| SQLite | kết nối đã đóng sau giao dịch; dùng lại báo `ProgrammingError` | Đạt |
+| Sao lưu | `/api/backup` trả tệp SQLite hợp lệ | Đạt |
+| Xuất | gói ZIP đọc được và chứa Survey.xlsx sau khi đổi vị trí kho media | Đạt |
+
+Bảy phép thử cuối được bổ sung sau khi tổ chức lại mã nguồn thành package `video_ab/` ngày 08-09-2026.
 
 ## Kiểm tra giao diện và xuất
 

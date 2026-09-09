@@ -44,3 +44,5 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+*.egg-info/
+__MACOSX/

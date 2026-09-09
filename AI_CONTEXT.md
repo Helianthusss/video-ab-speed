@@ -10,17 +10,21 @@ Python 3.12, Flask, SQLite, PyAV, NumPy/SciPy, openpyxl, python-docx, ReportLab;
 
 ## Main files
 
-- `app.py`: API, SQLite, workflow phiên và upload.
-- `core.py`: công thức, thống kê, sampling và summary.
-- `media.py`: media storage, frame và PTS.
-- `exports.py`, `workbook_export.py`: CSV/XLSX/DOCX/PDF/ZIP.
-- `static/`: toàn bộ UI.
-- `schema.sql`: database baseline.
-- `tests.py`: nghiệm thu.
+- `video_ab/web.py`: Flask API, upload, access controls.
+- `video_ab/config.py`: đường dẫn và biến môi trường.
+- `video_ab/storage.py`: SQLite và lịch sử; context manager đóng kết nối.
+- `video_ab/services.py`: workflow phiên và kiểm tra mốc đo.
+- `video_ab/core.py`: công thức, thống kê, sampling.
+- `video_ab/media.py`: video, frame và PTS.
+- `video_ab/exports.py`, `video_ab/workbook_export.py`: xuất báo cáo.
+- `video_ab/static/`, `video_ab/schema.sql`: tài nguyên package.
+- `scripts/`: khởi tạo DB và tạo demo; `tests/`: test dữ liệu tạm.
+- `pyproject.toml`: metadata package, CLI và Ruff.
+- `app.py`, `demo_build.py`, `tests.py`: entry point tương thích.
 
 ## Runtime data
 
-Database và video nằm trong `AB_DATA_DIR` (`data/` mặc định). Output nằm trong `AB_OUTPUT_DIR` (`outputs/` mặc định). Các thư mục này không commit. Không có auth. Chỉ chạy localhost.
+Database và video nằm trong `AB_DATA_DIR` (`data/` mặc định). Output nằm trong `AB_OUTPUT_DIR` (`outputs/` mặc định). Các thư mục này không commit. Có Basic Auth cho host ngoài localhost. Demo dùng AB_DEMO_DIR; test tự cấu hình thư mục tạm trong process mới.
 
 ## Architectural rules
 
@@ -41,12 +45,13 @@ Database và video nằm trong `AB_DATA_DIR` (`data/` mặc định). Output n�
 
 ```bash
 source .venv/bin/activate
-python app.py
+python -m video_ab
+python -m unittest discover -s tests -v
 ```
 
 ## Known issues
 
-Local single-process design; chưa có auth, migration framework, CI hoặc block bootstrap; chưa stress-test video nhiều giờ.
+Local single-process design; chưa có migration framework, CI hoặc block bootstrap; chưa stress-test video nhiều giờ.
 
 ## Rules for future AI work
 
