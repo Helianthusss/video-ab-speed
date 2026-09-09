@@ -4,7 +4,6 @@ services:
     runtime: python
     plan: free
     region: singapore
-    branch: render-deploy
     buildCommand: >-
       pip install -r requirements.txt &&
       curl -fsSL -o demo.mp4
