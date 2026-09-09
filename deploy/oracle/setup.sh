@@ -7,7 +7,6 @@
 set -euo pipefail
 
 APP_DIR=/opt/video-ab
-REPO=https://github.com/Helianthusss/video-ab-speed.git
 SERVICE_USER=videoab
 
 echo "==> 1/6 Cai goi he thong"
@@ -27,12 +26,14 @@ if ! command -v caddy >/dev/null 2>&1; then
     apt-get install -y -qq caddy
 fi
 
-echo "==> 3/6 Tao tai khoan dich vu va tai ma nguon"
+echo "==> 3/6 Tao tai khoan dich vu"
 id -u "$SERVICE_USER" >/dev/null 2>&1 || useradd --system --create-home --shell /usr/sbin/nologin "$SERVICE_USER"
-if [ -d "$APP_DIR/.git" ]; then
-    git -C "$APP_DIR" pull --ff-only
-else
-    git clone --depth 1 "$REPO" "$APP_DIR"
+# Ma nguon duoc chep len truoc bang scp, khong tai tu GitHub, de repo co the
+# de o che do rieng tu.
+if [ ! -f "$APP_DIR/requirements.txt" ]; then
+    echo "Chua thay ma nguon tai $APP_DIR." >&2
+    echo "Chep len truoc, vi du: scp -r ./ ubuntu@<IP>:/tmp/video-ab" >&2
+    exit 1
 fi
 
 echo "==> 4/6 Cai thu vien Python"

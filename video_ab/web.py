@@ -196,6 +196,13 @@ def frame(key, index):
     return send_file(io.BytesIO(frame_bytes(key, index)), mimetype="image/jpeg")
 
 
+@app.get("/api/video/<key>")
+def stream_video(key):
+    if len(key) != 64 or any(c not in "0123456789abcdef" for c in key):
+        raise ValueError("Mã video không hợp lệ")
+    return send_file(metadata(key)["path"], conditional=True)
+
+
 @app.post("/api/import/<sid>/<cam>")
 def imp(sid, cam):
     if cam not in ["A", "B"]:

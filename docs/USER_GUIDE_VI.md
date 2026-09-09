@@ -6,6 +6,23 @@ Tài liệu này dành cho người mới sử dụng máy tính và chưa có k
 
 ---
 
+## Bắt đầu nhanh với bản demo online
+
+Mở link HTTPS do người triển khai cung cấp. Link Cloudflare tạm có thể thay đổi khi mở lại demo. Đăng nhập bằng tài khoản và mật khẩu được cung cấp riêng; không lưu mật khẩu vào tài liệu hoặc Git.
+
+1. Chọn **Demo · DEMO-HF** ở **Phiên đang mở**. Bản demo đã có đoạn video khoảng 2 phút tại cả A và B, hai vạch minh họa và xác nhận đồng bộ.
+2. Ở **1. Đo video**, bấm **Phát video** dưới Camera A hoặc B. Hai camera điều khiển riêng. Bấm **Tạm dừng** trước khi chọn mốc.
+3. Dùng thanh tua để tìm xe, sau đó **−1 frame / +1 frame** để chọn khung hình đầu tiên mà đầu xe chạm/cắt vạch. Frame ngay trước phải chưa chạm.
+4. Chọn hướng, loại xe, nhập đặc điểm nhận dạng và bấm **Ghi mốc đầu**. Tìm đúng xe tại camera còn lại, chọn frame theo cùng quy tắc rồi **Ghi mốc cuối**.
+5. Mở bản ghi để rà soát: chỉ chọn **Đã xác nhận** và **Giữ** khi đủ căn cứ. Xe bị che khuất cần ghi QC và lý do, không đoán timestamp.
+6. Mở **5. Kết quả & xuất → Tính lại**. Muốn đánh giá độ lặp lại, thực hiện **4. Kiểm tra độc lập** theo mục 19 trước khi tải báo cáo.
+
+**Phát video và chọn frame:** nút Phát video dùng trình phát video trực tiếp của trình duyệt, có bộ đệm và tốc độ 0.25× / 0.5× / 1× / 2×. Vạch vẫn hiển thị trên hình. Khi tạm dừng, tua hoặc bước ±1 frame, phần mềm lấy ảnh gốc theo chỉ mục PTS để kiểm tra mốc. Không ghi mốc trong lúc một camera còn phát. Đường truyền vẫn có thể gây chờ tải; con số FPS trên màn hình là FPS nguồn. Thời gian đo lấy từ PTS, không lấy thời gian chờ mạng. Nếu trình duyệt không hỗ trợ codec, dùng MP4 H.264 hoặc bước frame; không tự thay video đã dùng để đo.
+
+Máy đang chạy demo phải bật, có Internet và không sleep. Nếu trang hoặc ảnh không tải, kiểm tra máy chủ và tunnel trước; tải lại trang sẽ đưa vị trí xem về đầu video. Dữ liệu đã lưu nằm trên máy chủ; tránh nhiều người cùng sửa một phiên.
+
+**Giới hạn demo:** A và B dùng cùng một clip, vạch và L = 100 m chỉ minh họa. Bản này giúp học quy trình, không xác nhận tốc độ thực của xe. Giao diện hiện tại chọn frame và ghép xe thủ công; YOLO/tracker thử nghiệm chưa tự động vận hành trong web này.
+
 ## 1. Phần mềm dùng để làm gì?
 
 Phần mềm đo **tốc độ hành trình của cùng một phương tiện** giữa hai vị trí:
@@ -364,6 +381,31 @@ Một xe chỉ được giữ trong kết quả khi đã có đủ hai mốc, t�
 - **P85:** tốc độ mà 85% quan sát không vượt quá, khi đủ điều kiện tính.
 
 Không kết luận về tai nạn hoặc quan hệ nhân quả chỉ từ một bảng tốc độ.
+
+### Công thức và các độ đo đánh giá
+
+Với timestamp đã quy về đồng hồ A: hướng A→B dùng `Δt = tB_corrected − tA_corrected`; hướng B→A dùng `Δt = tA_corrected − tB_corrected`. Tốc độ hành trình `v = 3.6 × L / Δt` (km/h), chỉ tính khi L và Δt dương. Đây là tốc độ trung bình trên đoạn đường giữa hai vạch, không phải tốc độ tức thời tại camera.
+
+Ví dụ tính toán minh họa: L = 100 m và Δt = 10 s cho v = 36 km/h. Khoảng cách cần đo giữa hai vạch theo tuyến xe chạy, không chỉ lấy khoảng cách giữa thân hai camera.
+
+Trong ZIP báo cáo, xem bảng/sheet **Audit** để đối chiếu từng xe và **Reliability** để xem các chỉ số tổng hợp. Các chỉ số này hiện nằm trong báo cáo xuất, không phải tất cả đều có biểu đồ trên web.
+
+| Chỉ số | Ý nghĩa và đơn vị |
+|---|---|
+| `n` | Số cặp đo gốc–đo lại tính được tốc độ; không phải tổng số xe trong video. |
+| `bias` | Trung bình (tốc độ đo lại − tốc độ gốc), km/h; dấu cho biết xu hướng lệch. |
+| `MAE` | Trung bình trị tuyệt đối chênh lệch tốc độ, km/h. |
+| `RMSE` | Căn trung bình bình phương chênh lệch tốc độ, km/h; nhạy hơn với chênh lệch lớn. |
+| `limits` | Giới hạn đồng thuận: bias ± 1.96 × SD của chênh lệch, km/h; cần ít nhất hai cặp. Không phải khoảng tin cậy của tốc độ trung bình. |
+| `frame_difference_A/B` | Frame đo lại trừ frame gốc, theo từng camera, trong bảng Audit. |
+| `time_difference_A/B` | Timestamp thô đo lại trừ timestamp gốc, giây, trong bảng Audit. |
+| `correct / incorrect / uncertain` | Số lần kiểm tra ghép xe được đánh dấu đúng / sai / không chắc. `matching_denominator` là tổng lượt audit hoàn thành. |
+
+Nếu cần tỷ lệ khớp đúng, tính `100 × correct / matching_denominator` và báo cáo cả số sai, không chắc; không tự bỏ nhóm không chắc khỏi mẫu số. Đây là kết luận của người kiểm tra, chưa phải độ chính xác so với chuẩn độc lập. Khi chưa đo lại, các chỉ số trống là bình thường, không có nghĩa sai số bằng 0.
+
+Các thống kê Mean, SD, CV, Median, V85 mô tả phân bố tốc độ; chúng không đo độ chính xác nhận dạng xe. MAE/RMSE ở đây đo sự đồng thuận giữa các lần thao tác, không chứng minh tốc độ đúng ngoài hiện trường. Hai lần cùng sai L hoặc đồng bộ vẫn có thể đồng thuận tốt. Mã hiện tại tổng hợp các cặp audit tính được tốc độ; hãy xem riêng cặp khớp sai/không chắc và phân biệt kiểm tra cùng người với khác người khi diễn giải.
+
+Để đánh giá đề tài, chuẩn bị tập kiểm tra có xe máy bị che khuất và các cặp ô tô/xe tải dễ nhầm, ghi nhãn độc lập và giữ tập này riêng với dữ liệu tinh chỉnh. Nếu đánh giá AI, cần bổ sung bảng nhầm lẫn và precision/recall theo loại xe, tỷ lệ bỏ sót, lỗi ghép A–B và sai lệch thời điểm chạm vạch so với nhãn chuẩn. Web hiện chưa tự tính các chỉ số AI này. Chốt ngưỡng chấp nhận trước khi đánh giá; không suy ra một tỷ lệ chính xác khi chưa có tập chuẩn.
 
 ## 21. Xuất báo cáo
 
