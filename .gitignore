@@ -46,3 +46,6 @@ Thumbs.db
 *.swp
 *.egg-info/
 __MACOSX/
+
+# Video tai ve luc build, khong nam trong nhanh trien khai
+deploy/huggingface/demo.mp4
