@@ -21,7 +21,7 @@ Trong **Settings** của Space, thêm ba biến:
 
 | Tên | Loại | Giá trị |
 |---|---|---|
-| `AB_ALLOWED_HOST` | Variable | tên miền của Space, ví dụ `helianthusss-video-ab-speed.hf.space` |
+| `AB_ALLOWED_HOST` | Variable | tên miền của Space, ví dụ `anhtd20-video-ab-speed.hf.space` |
 | `AB_USERNAME` | Secret | tên đăng nhập |
 | `AB_PASSWORD` | Secret | mật khẩu |
 
