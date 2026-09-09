@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: video-ab-speed
+    runtime: python
+    plan: free
+    region: singapore
+    branch: render-deploy
+    buildCommand: >-
+      pip install -r requirements.txt &&
+      curl -fsSL -o demo.mp4
+      https://raw.githubusercontent.com/Helianthusss/video-ab-speed/main/deploy/huggingface/demo.mp4 &&
+      PYTHONPATH=. python deploy/huggingface/seed_demo.py demo.mp4
+    startCommand: >-
+      gunicorn --workers 1 --threads 4 --timeout 300 --pythonpath .
+      --bind 0.0.0.0:$PORT video_ab.web:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.14
+      - key: AB_USERNAME
+        value: demo
+      # The application refuses any host it was not configured for, so it needs
+      # the address Render assigns to this very service.
+      - key: AB_ALLOWED_HOST
+        fromService:
+          type: web
+          name: video-ab-speed
+          property: host
+      # Set in the Render dashboard; never stored in the repository.
+      - key: AB_PASSWORD
+        sync: false
