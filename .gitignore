@@ -46,3 +46,6 @@ Thumbs.db
 *.swp
 *.egg-info/
 __MACOSX/
+
+
+models/*.pt

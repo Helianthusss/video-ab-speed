@@ -467,3 +467,28 @@ def main():
         port=int(os.environ.get("AB_PORT", "8765")),
         threaded=True,
     )
+
+
+@app.post("/api/yolo/<sid>")
+def yolo_start(sid):
+    from .yolo_jobs import start
+
+    return jsonify(start(get(sid), request.get_json() or {})), 202
+
+
+@app.get("/api/yolo/job/<ident>")
+def yolo_status(ident):
+    from .yolo_jobs import folder
+
+    return jsonify(json.loads((folder(ident) / "status.json").read_text(encoding="utf-8")))
+
+
+@app.get("/api/yolo/job/<ident>/result")
+def yolo_result(ident):
+    from .yolo_jobs import folder
+
+    dest = folder(ident)
+    state = json.loads((dest / "status.json").read_text(encoding="utf-8"))
+    if state["status"] != "done":
+        raise ValueError("Kết quả chưa sẵn sàng")
+    return send_file(dest / "detections.json", as_attachment=True)
