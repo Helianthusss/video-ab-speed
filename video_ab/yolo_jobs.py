@@ -80,7 +80,15 @@ def start(session, data):
         write(dest / "status.json", state)
         write(
             dest / "input.json",
-            dict(weights=str(weights), media=m, device=os.environ.get("AB_YOLO_DEVICE", "auto")),
+            dict(
+                weights=str(weights),
+                media=m,
+                device=os.environ.get("AB_YOLO_DEVICE", "auto"),
+                # Both lines and the distance come from the session so the worker can
+                # report a travel time between them; without them it only detects.
+                lines=session.get("lines") or {},
+                distance=session.get("L"),
+            ),
         )
         threading.Thread(target=launch, args=(dest,), daemon=True).start()
         return state

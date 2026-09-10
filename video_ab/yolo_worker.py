@@ -6,6 +6,59 @@ from pathlib import Path
 
 from .yolo_jobs import write
 
+VEHICLES = ("car", "motorcycle", "truck", "bus", "bicycle")
+
+
+def side(line, point):
+    """Which side of the line the point lies on, in normalised image space."""
+    (x1, y1), (x2, y2) = line
+    x, y = point
+    value = (x2 - x1) * (y - y1) - (y2 - y1) * (x - x1)
+    if value > 1e-9:
+        return 1
+    if value < -1e-9:
+        return -1
+    return 0
+
+
+def crossings(tracks, lines, distance):
+    """Travel time and speed for tracks that crossed both lines.
+
+    The reference point is the bottom centre of the box, which is not the
+    physical front of the vehicle, so every speed here is an estimate offered
+    for review rather than a measurement.
+    """
+    rows = []
+    for ident, track in sorted(tracks.items()):
+        times = {}
+        for name in ("A", "B"):
+            if lines.get(name):
+                previous = None
+                for point, moment in track["path"]:
+                    current = side(lines[name], point)
+                    if previous and current and current != previous:
+                        times[name] = moment
+                        break
+                    if current:
+                        previous = current
+        row = dict(
+            track_id=ident,
+            label=track["label"],
+            first_time=track["path"][0][1],
+            last_time=track["path"][-1][1],
+            frames=len(track["path"]),
+            time_A=times.get("A"),
+            time_B=times.get("B"),
+        )
+        if times.get("A") is not None and times.get("B") is not None:
+            delta = abs(times["B"] - times["A"])
+            row["travel_seconds"] = round(delta, 4)
+            row["direction"] = "A→B" if times["B"] > times["A"] else "B→A"
+            if delta > 0 and distance and distance > 0:
+                row["speed_kmh"] = round(3.6 * distance / delta, 2)
+        rows.append(row)
+    return rows
+
 
 def run(dest):
     state = json.loads((dest / "status.json").read_text(encoding="utf-8"))
@@ -24,11 +77,7 @@ def run(dest):
         state.update(status="running", device=device)
         write(dest / "status.json", state)
         model = YOLO(config["weights"])
-        ids = [
-            i
-            for i, name in model.names.items()
-            if name in ("car", "motorcycle", "truck", "bus", "bicycle")
-        ]
+        ids = [i for i, name in model.names.items() if name in VEHICLES]
         if not ids:
             raise ValueError("Weights không có nhãn phương tiện COCO được hỗ trợ")
         m = config["media"]
@@ -39,6 +88,7 @@ def run(dest):
         ]
         by_pts = {f["pts"]: f for f in selected}
         rows = []
+        tracks = {}
         begun = time.monotonic()
         with av.open(m["path"]) as source:
             st = source.streams.video[0]
@@ -49,22 +99,35 @@ def run(dest):
                 if frame.pts not in by_pts:
                     continue
                 f = by_pts[frame.pts]
-                result = model.predict(
+                # Tracking keeps one identity across frames, which is what makes a
+                # crossing time, and therefore a travel time, possible at all.
+                result = model.track(
                     frame.to_ndarray(format="bgr24"),
+                    persist=True,
+                    tracker="bytetrack.yaml",
                     classes=ids,
                     conf=state["confidence"],
                     imgsz=640,
                     device=device,
                     verbose=False,
                 )[0]
-                boxes = [
-                    dict(
-                        label=model.names[int(b.cls.item())],
-                        confidence=round(float(b.conf.item()), 4),
-                        xyxyn=b.xyxyn[0].tolist(),
+                boxes = []
+                for b in result.boxes:
+                    label = model.names[int(b.cls.item())]
+                    xyxyn = b.xyxyn[0].tolist()
+                    ident = int(b.id.item()) if b.id is not None else None
+                    boxes.append(
+                        dict(
+                            label=label,
+                            confidence=round(float(b.conf.item()), 4),
+                            xyxyn=xyxyn,
+                            track_id=ident,
+                        )
                     )
-                    for b in result.boxes
-                ]
+                    if ident is not None:
+                        point = ((xyxyn[0] + xyxyn[2]) / 2, xyxyn[3])
+                        track = tracks.setdefault(ident, dict(label=label, path=[]))
+                        track["path"].append((point, f["time"]))
                 rows.append(
                     dict(
                         frame=f["index"],
@@ -79,6 +142,9 @@ def run(dest):
                     write(dest / "status.json", state)
         if len(rows) != state["total"]:
             raise ValueError("Không giải mã đủ frame")
+        lines = config.get("lines") or {}
+        table = crossings(tracks, lines, config.get("distance"))
+        measured = [r for r in table if r.get("speed_kmh") is not None]
         write(
             dest / "detections.json",
             dict(
@@ -86,14 +152,24 @@ def run(dest):
                 camera=state["camera"],
                 media_id=state["media_id"],
                 weights=Path(config["weights"]).name,
+                distance_m=config.get("distance"),
+                lines=lines,
                 frames=rows,
-                note="Detection only; not unique vehicle count or cross-camera matching",
+                tracks=table,
+                note=(
+                    "Tracking estimate. The reference point is the bottom centre of the "
+                    "box, not the vehicle front, so speeds are for review only and are "
+                    "not survey measurements. Track identities are not unique vehicle "
+                    "counts."
+                ),
             ),
         )
         state.update(
             status="done",
             elapsed_seconds=round(time.monotonic() - begun, 2),
             detections=sum(len(r["boxes"]) for r in rows),
+            tracks=len(table),
+            crossed_both=len(measured),
         )
     except Exception as exc:
         state.update(status="failed", error=str(exc))
