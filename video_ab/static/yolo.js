@@ -10,18 +10,47 @@
   for(const b of row.boxes){let [x,y,r,t]=b.xyxyn;x*=canvas.width;r*=canvas.width;y*=canvas.height;t*=canvas.height;const track=b.track_id!=null?data.byTrack?.get(b.track_id):null;ctx.strokeStyle=track?.speed_kmh!=null?'#ffd23f':'#41ff84';ctx.strokeRect(x,y,r-x,t-y);const label=(b.track_id!=null?'#'+b.track_id+' ':'')+b.label+(track?.speed_kmh!=null?' · '+track.speed_kmh+' km/h':' '+Math.round(b.confidence*100)+'%');ctx.fillStyle='#102c20';ctx.fillRect(x,Math.max(0,y-24),ctx.measureText(label).width+8,24);ctx.fillStyle='#fff';ctx.fillText(label,x+4,Math.max(18,y-5));}
   ctx.restore();
  };
+ const JOBS='video-ab-yolo-jobs';
+ const readJobs=()=>{try{return JSON.parse(localStorage.getItem(JOBS))||{}}catch{return {}}};
+ const saveJob=(camera,id)=>{const all=readJobs();all[camera]=id;localStorage.setItem(JOBS,JSON.stringify(all))};
+ async function restore(){
+  // Nap lai ket qua cua ca hai camera sau khi tai trang, khong chi tac vu cuoi.
+  for(const [camera,id] of Object.entries(readJobs())){
+   try{
+    const job=await api('/api/yolo/job/'+id);
+    if(job.status!=='done')continue;
+    const data=await api('/api/yolo/job/'+id+'/result');
+    data.byFrame=new Map(data.frames.map(r=>[r.frame,r]));
+    data.byTrack=new Map((data.tracks||[]).map(r=>[r.track_id,r]));
+    results[camera]=data;last=data;
+    el('aiShow').hidden=false;el('aiDownload').hidden=false;el('aiDownload').href='/api/yolo/job/'+id+'/result';
+   }catch{}
+  }
+  const co=Object.keys(results);
+  if(co.length)status('Đã nạp lại kết quả camera '+co.join(' và ')+'. Bấm Xem đoạn đã nhận diện.');
+ }
  async function poll(id){try{
   const job=await api('/api/yolo/job/'+id);if(active!==id)return;
   el('aiProgress').value=100*job.processed/Math.max(1,job.total);
   status(`Camera ${job.camera}: ${job.processed}/${job.total} frame · ${job.status}`);
-  if(job.status==='done'){
+  if(job.status==='done'){saveJob(job.camera,id);
    const data=await api('/api/yolo/job/'+id+'/result');data.byFrame=new Map(data.frames.map(r=>[r.frame,r]));data.byTrack=new Map((data.tracks||[]).map(r=>[r.track_id,r]));results[data.camera]=data;last=data;
    el('aiRun').disabled=false;el('aiShow').hidden=false;el('aiDownload').hidden=false;el('aiDownload').href='/api/yolo/job/'+id+'/result';
    status(`Hoàn tất Camera ${job.camera}: ${job.total} frame trong ${job.elapsed_seconds} giây, thiết bị ${job.device==='0'?'GPU':job.device}. ${job.detections} lượt phát hiện, ${job.tracks??0} xe được theo dõi, ${job.crossed_both??0} xe cắt cả hai vạch nên có tốc độ ước lượng. Tốc độ dùng điểm giữa đáy khung bao, không phải đầu xe, chỉ để rà soát chứ không phải số đo. Bấm Xem đoạn đã nhận diện.`);
   }else if(job.status==='failed'){el('aiRun').disabled=false;status('YOLO: '+job.error)}else timer=setTimeout(()=>poll(id),1500);
  }catch(e){el('aiRun').disabled=false;status('Không đọc được tác vụ: '+e.message)}}
  el('aiRun').onclick=async()=>{if(!s)return status('Chọn phiên trước.');el('aiRun').disabled=true;el('aiShow').hidden=true;el('aiDownload').hidden=true;clearTimeout(timer);status('Khởi tạo YOLO…');try{const job=await api('/api/yolo/'+s.id,{camera:el('aiCamera').value,start:Number(el('aiStart').value),duration:Number(el('aiDuration').value),confidence:Number(el('aiConf').value)});active=job.id;localStorage.setItem('video-ab-yolo',active);poll(active)}catch(e){el('aiRun').disabled=false;status(e.message)}};
- el('aiShow').onclick=safe(async()=>{if(!last||s.id!==last.session_id||meta[last.camera]?.id!==last.media_id)return status('Chọn lại đúng phiên và video của tác vụ này.');await show(last.camera,last.frames[0].frame);el('camera'+last.camera).scrollIntoView({block:'center'});});
+ el('aiShow').onclick=safe(async()=>{
+  const moved=[];
+  for(const camera of ['A','B']){
+   const data=results[camera];
+   if(!data||data.session_id!==s.id||meta[camera]?.id!==data.media_id)continue;
+   await show(camera,data.frames[0].frame);moved.push(camera);
+  }
+  if(!moved.length)return status('Chưa có kết quả đúng phiên và video này. Hãy chạy YOLO trước.');
+  el('camera'+moved[0]).scrollIntoView({block:'center'});
+  status('Đã nhảy tới đoạn đã nhận diện của camera '+moved.join(' và ')+'. Bấm Phát video hoặc +1 frame để xem khung chạy theo xe.');
+ });
  el('aiVisible').onchange=safe(async()=>{for(const c of ['A','B'])if(meta[c]&&!playing[c])await show(c,frames[c]);});
- active=localStorage.getItem('video-ab-yolo');if(active)poll(active);
+ el('aiRun').disabled=false;restore();
 })();
