@@ -42,20 +42,26 @@ def start(session, data):
     camera = data.get("camera", "A")
     if camera not in ("A", "B") or not session.get("video" + camera):
         raise ValueError("Chọn camera đã nhập video")
-    begin, duration, confidence = (
-        float(data.get(k, v)) for k, v in [("start", 0), ("duration", 5), ("confidence", 0.25)]
-    )
+    begin = float(data.get("start", 0))
+    raw_duration = data.get("duration", 0 if data.get("full") else 5)
+    duration = float(raw_duration)
+    confidence = float(data.get("confidence", 0.25))
     if (
         not all(math.isfinite(v) for v in (begin, duration, confidence))
         or begin < 0
-        or not 0 < duration <= 30
+        or duration < 0
         or not 0.05 <= confidence <= 0.95
     ):
-        raise ValueError("Độ dài phải từ trên 0 đến 30 giây, confidence từ 0.05 đến 0.95")
+        raise ValueError("Thời điểm bắt đầu, thời lượng hoặc độ chắc của AI không hợp lệ")
     m = metadata(session["video" + camera])
-    chosen = [f for f in m["frames"] if begin <= f["time"] < begin + duration]
-    if not chosen or len(chosen) > 1800:
-        raise ValueError("Đoạn xử lý không có frame hoặc vượt 1800 frame")
+    if duration == 0 or data.get("full"):
+        chosen = [f for f in m["frames"] if f["time"] >= begin]
+        if chosen:
+            duration = max(0.0, chosen[-1]["time"] - begin)
+    else:
+        chosen = [f for f in m["frames"] if begin <= f["time"] < begin + duration]
+    if not chosen:
+        raise ValueError("Không có hình video trong đoạn cần AI nhận diện")
     weights = Path(os.environ.get("AB_YOLO_WEIGHTS", ROOT / "models/yolo26n.pt")).resolve()
     if not weights.is_file():
         raise ValueError("Chưa có weights YOLO trên máy chủ")
