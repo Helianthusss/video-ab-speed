@@ -154,7 +154,16 @@ Nếu upload thành công nhưng video chờ lâu, đó thường là thời gia
 
 ## YOLO nhận diện phương tiện
 
-YOLO là chức năng hỗ trợ, không thay thế thao tác chọn frame A/B. Giao diện cho phép chọn camera, thời điểm bắt đầu, độ dài đoạn xử lý và ngưỡng tin cậy. Kết quả hiển thị khung nhận diện trên video gốc và có thể tải JSON.
+YOLO là chức năng hỗ trợ rà soát nhanh, không thay thế thao tác chọn mốc A/B của người dùng. Trong tab **Đo video**, sau khi đã nhập đủ hai video và khóa vạch A, B, bấm **AI nhận diện xe A và B**. Phần mềm tự chạy Camera A rồi Camera B cho toàn bộ video.
+
+Để demo nhanh, giao diện có **Chế độ AI**:
+
+- `Nhanh - demo`: mặc định, xử lý thưa hình để giảm thời gian chờ.
+- `Rất nhanh`: chờ ít hơn, dễ bỏ sót hơn.
+- `Cân bằng`: chậm hơn nhưng theo dõi sát hơn.
+- `Kỹ hơn`: xử lý từng hình, phù hợp khi cần rà soát kỹ và máy đủ mạnh.
+
+Khi bấm **Phát video**, phần mềm chỉ ghi log lúc xe cắt qua vạch và đề xuất tốc độ theo thứ tự xe qua vạch. Kết quả AI là gợi ý để rà soát, vì tracker chưa chứng minh chắc chắn hai xe ở Camera A và B là cùng một xe.
 
 Để bật YOLO trên máy chủ, cài thư viện bổ sung và tải weights:
 
@@ -166,8 +175,7 @@ mkdir -p models
 Trên Linux/macOS:
 
 ```bash
-curl -L -o models/yolo26n.pt \
-  https://github.com/Helianthusss/video-ab-speed/raw/main/models/yolo26n.pt
+curl -L -o models/yolo26n.pt   https://github.com/Helianthusss/video-ab-speed/raw/main/models/yolo26n.pt
 ```
 
 Trên Windows PowerShell:
