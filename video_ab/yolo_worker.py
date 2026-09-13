@@ -84,8 +84,11 @@ def run(dest):
         selected = [
             f
             for f in m["frames"]
-            if state["start"] <= f["time"] < state["start"] + state["duration"]
+            if state["start"] <= f["time"] <= state["start"] + state["duration"] + 1e-9
         ]
+        stride = int(config.get("stride", state.get("stride", 1)) or 1)
+        if stride > 1:
+            selected = selected[::stride]
         by_pts = {f["pts"]: f for f in selected}
         rows = []
         tracks = {}
@@ -154,6 +157,7 @@ def run(dest):
                 weights=Path(config["weights"]).name,
                 distance_m=config.get("distance"),
                 lines=lines,
+                stride=stride,
                 frames=rows,
                 tracks=table,
                 note=(
@@ -178,3 +182,4 @@ def run(dest):
 
 if __name__ == "__main__":
     run(Path(sys.argv[1]))
+

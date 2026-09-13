@@ -46,13 +46,15 @@ def start(session, data):
     raw_duration = data.get("duration", 0 if data.get("full") else 5)
     duration = float(raw_duration)
     confidence = float(data.get("confidence", 0.25))
+    stride = int(data.get("stride", 5))
     if (
         not all(math.isfinite(v) for v in (begin, duration, confidence))
         or begin < 0
         or duration < 0
         or not 0.05 <= confidence <= 0.95
+        or stride not in (1, 3, 5, 8)
     ):
-        raise ValueError("Thời điểm bắt đầu, thời lượng hoặc độ chắc của AI không hợp lệ")
+        raise ValueError("Thời điểm bắt đầu, thời lượng, tốc độ AI hoặc độ chắc của AI không hợp lệ")
     m = metadata(session["video" + camera])
     if duration == 0 or data.get("full"):
         chosen = [f for f in m["frames"] if f["time"] >= begin]
@@ -60,6 +62,8 @@ def start(session, data):
             duration = max(0.0, chosen[-1]["time"] - begin)
     else:
         chosen = [f for f in m["frames"] if begin <= f["time"] < begin + duration]
+    if stride > 1:
+        chosen = chosen[::stride]
     if not chosen:
         raise ValueError("Không có hình video trong đoạn cần AI nhận diện")
     weights = Path(os.environ.get("AB_YOLO_WEIGHTS", ROOT / "models/yolo26n.pt")).resolve()
@@ -79,6 +83,7 @@ def start(session, data):
             start=begin,
             duration=duration,
             confidence=confidence,
+            stride=stride,
             total=len(chosen),
             processed=0,
             status="queued",
@@ -94,6 +99,7 @@ def start(session, data):
                 # report a travel time between them; without them it only detects.
                 lines=session.get("lines") or {},
                 distance=session.get("L"),
+                stride=stride,
             ),
         )
         threading.Thread(target=launch, args=(dest,), daemon=True).start()
