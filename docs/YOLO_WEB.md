@@ -11,7 +11,7 @@ Các chế độ AI dùng bước nhảy hình để đổi giữa tốc độ v
 
 Sau khi AI chạy xong, bấm **Xem đoạn đã nhận diện**, rồi bấm **Phát video**. Nhật ký AI chỉ ghi khi xe cắt qua vạch. Nếu phần mềm ghép được một xe ở A với một xe ở B theo thứ tự và loại xe hợp lý, nhật ký sẽ hiện **Đề xuất tốc độ**. Đây là kết quả hỗ trợ rà soát, chưa phải kết quả đo chính thức; người dùng vẫn phải kiểm tra đúng cùng xe và có thể ghi mốc thủ công.
 
-Khung AI trên video ưu tiên hiện xe đã qua vạch để tránh rối màn hình. Có thể tắt bằng ô **Hiện xe đã qua vạch**. JSON kết quả lưu nhãn, bbox chuẩn hóa, độ chắc, chỉ số hình và thời gian video.
+Khung AI trên video ưu tiên hiện xe đã qua vạch để tránh rối màn hình. Tùy chọn **Chỉ quét gần vạch** giúp YOLO tập trung vào vùng cần đo và chạy nhanh hơn; nếu video có xe bị che khuất hoặc vạch đặt sát mép hình, có thể tắt tùy chọn này để quét toàn khung. Có thể tắt bằng ô **Hiện xe đã qua vạch**. JSON kết quả lưu nhãn, bbox chuẩn hóa, độ chắc, chỉ số hình và thời gian video.
 
 Máy chạy Python phải bật, có Internet, không sleep. YOLO tự dùng CUDA nếu có, nếu không dùng CPU. Đây là suy luận weights, không huấn luyện; xử lý nền, chưa cam kết thời gian thực. Video dài hoặc chế độ **Kỹ hơn** sẽ chờ lâu hơn.
 

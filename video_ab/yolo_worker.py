@@ -60,6 +60,34 @@ def crossings(tracks, lines, distance):
     return rows
 
 
+def crop_box_for_line(line, width, height, margin=0.28):
+    if not line or len(line) != 2:
+        return None
+    xs = [max(0.0, min(1.0, p[0])) for p in line]
+    ys = [max(0.0, min(1.0, p[1])) for p in line]
+    x1 = int(max(0, (min(xs) - margin) * width))
+    x2 = int(min(width, (max(xs) + margin) * width))
+    y1 = int(max(0, (min(ys) - margin) * height))
+    y2 = int(min(height, (max(ys) + margin) * height))
+    if x2 - x1 < width * 0.25 or y2 - y1 < height * 0.20:
+        return None
+    return x1, y1, x2, y2
+
+
+def map_box_from_crop(xyxyn, crop, width, height):
+    if not crop:
+        return xyxyn
+    x1, y1, x2, y2 = crop
+    cw, ch = x2 - x1, y2 - y1
+    left, top, right, bottom = xyxyn
+    return [
+        (x1 + left * cw) / width,
+        (y1 + top * ch) / height,
+        (x1 + right * cw) / width,
+        (y1 + bottom * ch) / height,
+    ]
+
+
 def run(dest):
     state = json.loads((dest / "status.json").read_text(encoding="utf-8"))
     try:
@@ -92,6 +120,8 @@ def run(dest):
         by_pts = {f["pts"]: f for f in selected}
         rows = []
         tracks = {}
+        lines = config.get("lines") or {}
+        use_roi = bool(config.get("roi", True))
         begun = time.monotonic()
         with av.open(m["path"]) as source:
             st = source.streams.video[0]
@@ -104,8 +134,12 @@ def run(dest):
                 f = by_pts[frame.pts]
                 # Tracking keeps one identity across frames, which is what makes a
                 # crossing time, and therefore a travel time, possible at all.
+                image = frame.to_ndarray(format="bgr24")
+                height, width = image.shape[:2]
+                crop = crop_box_for_line(lines.get(state["camera"]), width, height) if use_roi else None
+                inference_image = image[crop[1]:crop[3], crop[0]:crop[2]] if crop else image
                 result = model.track(
-                    frame.to_ndarray(format="bgr24"),
+                    inference_image,
                     persist=True,
                     tracker="bytetrack.yaml",
                     classes=ids,
@@ -117,7 +151,7 @@ def run(dest):
                 boxes = []
                 for b in result.boxes:
                     label = model.names[int(b.cls.item())]
-                    xyxyn = b.xyxyn[0].tolist()
+                    xyxyn = map_box_from_crop(b.xyxyn[0].tolist(), crop, width, height)
                     ident = int(b.id.item()) if b.id is not None else None
                     boxes.append(
                         dict(
@@ -138,6 +172,7 @@ def run(dest):
                         time_base=f["time_base"],
                         time=f["time"],
                         boxes=boxes,
+                        roi=bool(crop),
                     )
                 )
                 state["processed"] += 1
@@ -145,7 +180,6 @@ def run(dest):
                     write(dest / "status.json", state)
         if len(rows) != state["total"]:
             raise ValueError("Không giải mã đủ frame")
-        lines = config.get("lines") or {}
         table = crossings(tracks, lines, config.get("distance"))
         measured = [r for r in table if r.get("speed_kmh") is not None]
         write(
@@ -158,6 +192,7 @@ def run(dest):
                 distance_m=config.get("distance"),
                 lines=lines,
                 stride=stride,
+                roi=use_roi,
                 frames=rows,
                 tracks=table,
                 note=(

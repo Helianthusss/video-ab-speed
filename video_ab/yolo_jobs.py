@@ -100,6 +100,7 @@ def start(session, data):
                 lines=session.get("lines") or {},
                 distance=session.get("L"),
                 stride=stride,
+                roi=bool(data.get("roi", True)),
             ),
         )
         threading.Thread(target=launch, args=(dest,), daemon=True).start()

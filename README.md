@@ -163,7 +163,7 @@ YOLO là chức năng hỗ trợ rà soát nhanh, không thay thế thao tác ch
 - `Cân bằng`: chậm hơn nhưng theo dõi sát hơn.
 - `Kỹ hơn`: xử lý từng hình, phù hợp khi cần rà soát kỹ và máy đủ mạnh.
 
-Khi bấm **Phát video**, phần mềm chỉ ghi log lúc xe cắt qua vạch và đề xuất tốc độ theo thứ tự xe qua vạch. Kết quả AI là gợi ý để rà soát, vì tracker chưa chứng minh chắc chắn hai xe ở Camera A và B là cùng một xe.
+Khi bấm **Phát video**, phần mềm chỉ ghi log lúc xe cắt qua vạch và đề xuất tốc độ theo thứ tự xe qua vạch. Có thể lọc nhật ký theo loại xe hoặc chỉ xem các dòng có tốc độ đề xuất. Nút **Tạo báo cáo demo nhanh** xuất CSV các tốc độ AI đề xuất, kèm nhãn độ tin cậy như `khả năng đúng cao`, `cần rà soát`, hoặc `nghi ngờ ghép sai`. Kết quả AI là gợi ý để rà soát, vì tracker chưa chứng minh chắc chắn hai xe ở Camera A và B là cùng một xe.
 
 Để bật YOLO trên máy chủ, cài thư viện bổ sung và tải weights:
 
