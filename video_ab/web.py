@@ -224,6 +224,20 @@ def imp(sid, cam):
     return jsonify(s)
 
 
+@app.post("/api/import_async/<sid>/<cam>")
+def import_async(sid, cam):
+    from .import_jobs import start
+
+    return jsonify(start(get(sid), cam, request.files.get("file"))), 202
+
+
+@app.get("/api/import_job/<ident>")
+def import_status(ident):
+    from .import_jobs import folder
+
+    return jsonify(json.loads((folder(ident) / "status.json").read_text(encoding="utf-8")))
+
+
 @app.post("/api/action/<sid>")
 def action(sid):
     with LOCK:
