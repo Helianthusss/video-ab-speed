@@ -1,6 +1,7 @@
 """Acceptance tests; all runtime writes stay in a temporary directory."""
 
 import copy
+import io
 import math
 import os
 import subprocess
@@ -9,6 +10,7 @@ import tempfile
 import unittest
 import uuid
 from pathlib import Path
+from unittest.mock import patch
 
 _temporary = tempfile.TemporaryDirectory(prefix="video-ab-tests-")
 _root = Path(_temporary.name)
@@ -255,6 +257,68 @@ class Acceptance(unittest.TestCase):
             connection.execute("SELECT 1")
         with self.assertRaises(sqlite3.ProgrammingError):
             connection.execute("SELECT 1")
+
+    def test_yolo_cache_uses_full_inference_inputs(self):
+        from video_ab import yolo_jobs
+
+        weights = _root / "test-weights.pt"
+        weights.write_bytes(b"test")
+        media = dict(id="test-media", frames=[dict(index=i, time=float(i)) for i in range(4)])
+        session = dict(id="test-session", videoA="test-media", lines={"A": [[0, 0], [1, 1]]}, L=100)
+        with patch.object(yolo_jobs, "JOBS", _root / "yolo-cache-tests"), patch.object(
+            yolo_jobs, "metadata", return_value=media
+        ), patch.dict(os.environ, {"AB_YOLO_WEIGHTS": str(weights)}), patch.object(
+            yolo_jobs.threading.Thread, "start"
+        ):
+            first = yolo_jobs.start(session, {"camera": "A", "duration": 2, "stride": 1})
+            yolo_jobs.LOCK.release()
+            folder = yolo_jobs.folder(first["id"])
+            (folder / "detections.json").write_text("{}", encoding="utf-8")
+            first["status"] = "done"
+            yolo_jobs.write(folder / "status.json", first)
+            same = yolo_jobs.start(session, {"camera": "A", "duration": 2, "stride": 1})
+            self.assertEqual(same["id"], first["id"])
+            longer = yolo_jobs.start(session, {"camera": "A", "duration": 3, "stride": 1})
+            self.assertNotEqual(longer["id"], first["id"])
+            yolo_jobs.LOCK.release()
+
+    def test_video_import_preserves_concurrent_session_update(self):
+        ss = copy.deepcopy(self.s)
+        ss["id"] = str(uuid.uuid4())
+        ss["records"] = []
+        ss["protocol"]["locked"] = False
+        save(ss, "test import")
+
+        def index_and_update(_path):
+            changed = get(ss["id"])
+            changed["site"] = "Updated while indexing"
+            save(changed, "concurrent update")
+            return {"id": "new-media"}
+
+        with patch("video_ab.web.index_video", side_effect=index_and_update):
+            response = self.c.post(
+                f"/api/import/{ss['id']}/A",
+                data={"file": (io.BytesIO(b"video"), "sample.mp4")},
+                content_type="multipart/form-data",
+            )
+        self.assertEqual(response.status_code, 200, response.json)
+        self.assertEqual(response.json["site"], "Updated while indexing")
+        self.assertEqual(response.json["videoA"], "new-media")
+
+    def test_yolo_crossing_uses_bottom_center_and_video_time(self):
+        from video_ab.yolo_worker import crossings
+
+        tracks = {
+            7: {
+                "label": "motorcycle",
+                "path": [
+                    ((0.5, 0.6), 0.047, [0.4, 0.2, 0.6, 0.6]),
+                    ((0.5, 0.4), 0.123, [0.4, 0.1, 0.6, 0.4]),
+                ],
+            }
+        }
+        rows = crossings(tracks, {"A": [[0, 0.5], [1, 0.5]]}, 100)
+        self.assertEqual(rows[0]["time_A"], 0.123)
 
     def test_backup_endpoint(self):
         response = self.c.get("/api/backup")

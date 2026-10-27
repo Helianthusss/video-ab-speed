@@ -21,26 +21,67 @@ def side(line, point):
     return 0
 
 
-def crossings(tracks, lines, distance):
-    """Travel time and speed for tracks that crossed both lines.
+def ccw(a, b, c):
+    return (c[1] - a[1]) * (b[0] - a[0]) > (b[1] - a[1]) * (c[0] - a[0])
 
-    The reference point is the bottom centre of the box, which is not the
-    physical front of the vehicle, so every speed here is an estimate offered
-    for review rather than a measurement.
-    """
+
+def segs_intersect(p1, p2, p3, p4):
+    return (ccw(p1, p3, p4) != ccw(p2, p3, p4)) and (ccw(p1, p2, p3) != ccw(p1, p2, p4))
+
+
+def line_intersects_box(line, b):
+    (lx1, ly1), (lx2, ly2) = line
+    bx1, by1, bx2, by2 = b
+    if (bx1 <= lx1 <= bx2 and by1 <= ly1 <= by2) or (bx1 <= lx2 <= bx2 and by1 <= ly2 <= by2):
+        return True
+    corners = [(bx1, by1), (bx2, by1), (bx2, by2), (bx1, by2)]
+    for i in range(4):
+        if segs_intersect((lx1, ly1), (lx2, ly2), corners[i], corners[(i + 1) % 4]):
+            return True
+    return False
+
+
+def bottom_center_crossed(line, previous, current):
+    """Detect a crossing of the finite line by consecutive ground-contact points."""
+    if previous is None:
+        return False
+    (x1, y1), (x2, y2) = line
+
+    def signed(point):
+        return (x2 - x1) * (point[1] - y1) - (y2 - y1) * (point[0] - x1)
+
+    before, after = signed(previous), signed(current)
+    if abs(before) < 1e-9 and abs(after) < 1e-9 or before * after > 0:
+        return False
+    fraction = before / (before - after)
+    if not 0 <= fraction <= 1:
+        return False
+    x = previous[0] + fraction * (current[0] - previous[0])
+    y = previous[1] + fraction * (current[1] - previous[1])
+    return (
+        min(x1, x2) - 1e-6 <= x <= max(x1, x2) + 1e-6
+        and min(y1, y2) - 1e-6 <= y <= max(y1, y2) + 1e-6
+    )
+
+
+def crossings(tracks, lines, distance):
+    """Travel time and speed for tracks that crossed both lines."""
     rows = []
     for ident, track in sorted(tracks.items()):
         times = {}
         for name in ("A", "B"):
-            if lines.get(name):
-                previous = None
-                for point, moment in track["path"]:
-                    current = side(lines[name], point)
-                    if previous and current and current != previous:
-                        times[name] = moment
-                        break
-                    if current:
-                        previous = current
+            line = lines.get(name)
+            if not line or len(line) != 2:
+                continue
+            previous = None
+            for item in track["path"]:
+                point, moment = item[0], item[1]
+                box = item[2] if len(item) > 2 else None
+                current = ((box[0] + box[2]) / 2, box[3]) if box else point
+                if bottom_center_crossed(line, previous, current):
+                    times[name] = moment
+                    break
+                previous = current
         row = dict(
             track_id=ident,
             label=track["label"],
@@ -60,7 +101,7 @@ def crossings(tracks, lines, distance):
     return rows
 
 
-def crop_box_for_line(line, width, height, margin=0.28):
+def crop_box_for_line(line, width, height, margin=0.35):
     if not line or len(line) != 2:
         return None
     xs = [max(0.0, min(1.0, p[0])) for p in line]
@@ -98,86 +139,93 @@ def run(dest):
         from ultralytics import YOLO
 
         config = json.loads((dest / "input.json").read_text(encoding="utf-8"))
-        torch.set_num_threads(2)
+        import warnings
+        warnings.filterwarnings("ignore", message=".*half.*")
+        torch.set_num_threads(max(4, os.cpu_count() or 4))
         device = config["device"]
         if device == "auto":
             device = "0" if torch.cuda.is_available() else "cpu"
-        state.update(status="running", device=device)
+        is_cuda = (device != "cpu")
+        if is_cuda:
+            torch.backends.cudnn.benchmark = True
+        state.update(status="loading_model", device=device)
         write(dest / "status.json", state)
         model = YOLO(config["weights"])
         ids = [i for i, name in model.names.items() if name in VEHICLES]
         if not ids:
             raise ValueError("Weights không có nhãn phương tiện COCO được hỗ trợ")
+        state.update(status="running")
+        write(dest / "status.json", state)
         m = config["media"]
-        selected = [
-            f
-            for f in m["frames"]
-            if state["start"] <= f["time"] <= state["start"] + state["duration"] + 1e-9
-        ]
+        selected_indices = set(config["selected_indices"])
+        selected = [f for f in m["frames"] if f["index"] in selected_indices]
         stride = int(config.get("stride", state.get("stride", 1)) or 1)
-        if stride > 1:
-            selected = selected[::stride]
         by_pts = {f["pts"]: f for f in selected}
         rows = []
         tracks = {}
         lines = config.get("lines") or {}
         use_roi = bool(config.get("roi", True))
         begun = time.monotonic()
-        with av.open(m["path"]) as source:
-            st = source.streams.video[0]
-            source.seek(selected[0]["pts"], stream=st, backward=True)
-            for frame in source.decode(st):
-                if frame.pts > selected[-1]["pts"]:
-                    break
-                if frame.pts not in by_pts:
-                    continue
-                f = by_pts[frame.pts]
-                # Tracking keeps one identity across frames, which is what makes a
-                # crossing time, and therefore a travel time, possible at all.
-                image = frame.to_ndarray(format="bgr24")
-                height, width = image.shape[:2]
-                crop = crop_box_for_line(lines.get(state["camera"]), width, height) if use_roi else None
-                inference_image = image[crop[1]:crop[3], crop[0]:crop[2]] if crop else image
-                result = model.track(
-                    inference_image,
-                    persist=True,
-                    tracker="bytetrack.yaml",
-                    classes=ids,
-                    conf=state["confidence"],
-                    imgsz=640,
-                    device=device,
-                    verbose=False,
-                )[0]
-                boxes = []
-                for b in result.boxes:
-                    label = model.names[int(b.cls.item())]
-                    xyxyn = map_box_from_crop(b.xyxyn[0].tolist(), crop, width, height)
-                    ident = int(b.id.item()) if b.id is not None else None
-                    boxes.append(
+        with torch.inference_mode():
+            with av.open(m["path"]) as source:
+                st = source.streams.video[0]
+                st.thread_type = "AUTO"
+                if hasattr(st, "codec_context") and st.codec_context:
+                    st.codec_context.thread_count = min(8, os.cpu_count() or 4)
+                source.seek(selected[0]["pts"], stream=st, backward=True)
+                for frame in source.decode(st):
+                    if frame.pts > selected[-1]["pts"]:
+                        break
+                    if frame.pts not in by_pts:
+                        continue
+                    f = by_pts[frame.pts]
+                    # Tracking keeps one identity across frames, which is what makes a
+                    # crossing time, and therefore a travel time, possible at all.
+                    image = frame.to_ndarray(format="bgr24")
+                    height, width = image.shape[:2]
+                    crop = crop_box_for_line(lines.get(state["camera"]), width, height) if use_roi else None
+                    inference_image = image[crop[1]:crop[3], crop[0]:crop[2]] if crop else image
+                    result = model.track(
+                        inference_image,
+                        persist=True,
+                        tracker="bytetrack.yaml",
+                        classes=ids,
+                        conf=state["confidence"],
+                        imgsz=640,
+                        device=device,
+                        half=is_cuda,
+                        verbose=False,
+                    )[0]
+                    boxes = []
+                    for b in result.boxes:
+                        label = model.names[int(b.cls.item())]
+                        xyxyn = map_box_from_crop(b.xyxyn[0].tolist(), crop, width, height)
+                        ident = int(b.id.item()) if b.id is not None else None
+                        boxes.append(
+                            dict(
+                                label=label,
+                                confidence=round(float(b.conf.item()), 4),
+                                xyxyn=xyxyn,
+                                track_id=ident,
+                            )
+                        )
+                        if ident is not None:
+                            point = ((xyxyn[0] + xyxyn[2]) / 2, xyxyn[3])
+                            track = tracks.setdefault(ident, dict(label=label, path=[]))
+                            track["path"].append((point, f["time"], xyxyn))
+                    rows.append(
                         dict(
-                            label=label,
-                            confidence=round(float(b.conf.item()), 4),
-                            xyxyn=xyxyn,
-                            track_id=ident,
+                            frame=f["index"],
+                            pts=f["pts"],
+                            time_base=f["time_base"],
+                            time=f["time"],
+                            boxes=boxes,
+                            roi=bool(crop),
                         )
                     )
-                    if ident is not None:
-                        point = ((xyxyn[0] + xyxyn[2]) / 2, xyxyn[3])
-                        track = tracks.setdefault(ident, dict(label=label, path=[]))
-                        track["path"].append((point, f["time"]))
-                rows.append(
-                    dict(
-                        frame=f["index"],
-                        pts=f["pts"],
-                        time_base=f["time_base"],
-                        time=f["time"],
-                        boxes=boxes,
-                        roi=bool(crop),
-                    )
-                )
-                state["processed"] += 1
-                if state["processed"] % 5 == 0:
-                    write(dest / "status.json", state)
+                    state["processed"] += 1
+                    if state["processed"] % 10 == 0:
+                        write(dest / "status.json", state)
         if len(rows) != state["total"]:
             raise ValueError("Không giải mã đủ frame")
         table = crossings(tracks, lines, config.get("distance"))
@@ -189,6 +237,7 @@ def run(dest):
                 camera=state["camera"],
                 media_id=state["media_id"],
                 weights=Path(config["weights"]).name,
+                crossing_method="bottom-center-v2",
                 distance_m=config.get("distance"),
                 lines=lines,
                 stride=stride,

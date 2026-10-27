@@ -49,3 +49,9 @@ __MACOSX/
 
 
 models/*.pt
+
+# Local agent library and captured survey video samples
+.agents/
+datasets/ab_speed_sample/
+datasets/ab_speed_yolo_demo/
+ab_yolo_detect_preview.mp4

@@ -71,6 +71,8 @@ python demo_build.py
 
 Lệnh này tạo video tổng hợp và phiên `SYNTHETIC_KNOWN_ANSWER` trong thư mục runtime bị Git bỏ qua. Không tạo hoặc tải video công khai.
 
+Sau khi chạy, mở ứng dụng và chọn phiên `SYNTHETIC_KNOWN_ANSWER`. Hai video mẫu nằm ở `demo/synthetic_A.mp4` và `demo/synthetic_B.mp4`; phiên đã có khoảng cách, đồng bộ, vạch và vài bản ghi để thử giao diện, xuất báo cáo. Đây là dữ liệu giả lập để thử chức năng; các bản ghi có sẵn không phải nhãn chuẩn đo trực tiếp từ frame video và không dùng để đánh giá độ chính xác AI. Chạy lại lệnh sẽ tạo thêm một phiên Demo mới.
+
 ## Chạy development server
 
 ```bash

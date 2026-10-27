@@ -181,6 +181,14 @@ def session(sid):
     return jsonify(get(sid))
 
 
+@app.delete("/api/session/<sid>")
+def delete_session(sid):
+    with db() as c:
+        c.execute("DELETE FROM sessions WHERE id=?", (sid,))
+        c.execute("DELETE FROM history WHERE session=?", (sid,))
+    return jsonify(success=True)
+
+
 @app.get("/api/summary/<sid>")
 def sums(sid):
     return jsonify(summary(get(sid)))
@@ -193,7 +201,7 @@ def meta(key):
 
 @app.get("/api/frame/<key>/<int:index>")
 def frame(key, index):
-    return send_file(io.BytesIO(frame_bytes(key, index)), mimetype="image/jpeg")
+    return send_file(io.BytesIO(frame_bytes(key, index)), mimetype="image/jpeg", max_age=86400)
 
 
 @app.get("/api/video/<key>")
@@ -219,8 +227,12 @@ def imp(sid, cam):
         m = index_video(temp)
     finally:
         temp.unlink(missing_ok=True)
-    s["video" + cam] = m["id"]
-    save(s, "import video " + cam)
+    with LOCK:
+        s = get(sid)
+        if s["protocol"]["locked"] or s["records"]:
+            raise ValueError("Phiên đã có dữ liệu đo; hãy tạo phiên mới để đổi video")
+        s["video" + cam] = m["id"]
+        save(s, "import video " + cam)
     return jsonify(s)
 
 
@@ -329,6 +341,45 @@ def action(sid):
                 raise ValueError("Trùng ID")
             stamp(s, r, cam, v["frame"])
             s["records"].append(r)
+        elif op == "batch_ai_records":
+            missing = measurement_readiness(s)
+            if missing:
+                raise ValueError("Chưa thể nhập mốc: " + "; ".join(missing))
+            items = v.get("records") or []
+            if not items:
+                raise ValueError("Không có danh sách xe để nhập")
+            for item in items:
+                rec_id = item.get("id") or "AI_" + uuid.uuid4().hex[:8]
+                if any(x["id"] == rec_id for x in s["records"]):
+                    continue
+                vtype = item.get("type", "Car")
+                if vtype not in CLASSES:
+                    vtype = "Car"
+                vdir = item.get("direction", "A→B")
+                if vdir not in ["A→B", "B→A"]:
+                    vdir = "A→B"
+                r = dict(
+                    id=rec_id,
+                    type=vtype,
+                    direction=vdir,
+                    observer=s["observer"],
+                    protocol_version=s["protocol"]["version"],
+                    sync_version=s["sync"]["version"],
+                    qc=[0],
+                    decision="review",
+                    matching="review",
+                    reason="AI YOLO tự động nhận diện mốc cắt vạch",
+                    reviewer=s["observer"],
+                    sampling_status="census",
+                    description=item.get("description", "AI YOLO nhận diện"),
+                    created=now(),
+                    updated=now(),
+                )
+                if item.get("frameA") is not None:
+                    stamp(s, r, "A", int(item["frameA"]))
+                if item.get("frameB") is not None:
+                    stamp(s, r, "B", int(item["frameB"]))
+                s["records"].append(r)
         elif op in ["exit", "record"]:
             r = next((x for x in s["records"] if x["id"] == v.get("id")), None)
             if not r:

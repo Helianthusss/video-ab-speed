@@ -28,6 +28,9 @@ def db():
             c.execute(
                 "CREATE TABLE IF NOT EXISTS history(seq INTEGER PRIMARY KEY AUTOINCREMENT,session TEXT,at TEXT,action TEXT,body TEXT)"
             )
+            c.execute(
+                "CREATE INDEX IF NOT EXISTS idx_history_session_seq ON history(session, seq)"
+            )
             yield c
     finally:
         c.close()
